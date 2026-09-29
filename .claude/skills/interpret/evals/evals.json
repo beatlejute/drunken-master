@@ -47,6 +47,47 @@
         "The reply simply says it will run the tests and then commit",
         "The reply does not ask any clarification question"
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "Контекст: мы обсуждаем, в какой форме будет жить проект — как MCP-сервер или как навык (скилл) для Claude Code; я только что сказал, что решать это стоит по данным eval.\n\nСообщение пользователя (с телефона): «Возможно это станет скиллом фвлм конечный формат ещё не описание»\n\nОтветь пользователю так, как ответил бы в чате. Не пиши код.",
+      "expected_output": "Агент показывает прочтение «Возможно, это станет скиллом, вообще конечный формат ещё не определён» (фвлм — свайп-мусор, «описание» ← «определён») до ответа, затем соглашается/комментирует.",
+      "expectations": [
+        "The reply states its reading (or numbered alternatives) BEFORE any substantive comment",
+        "The reading treats «фвлм» as garbage and «описание» as «определён»/«не решён» (final format not yet decided)",
+        "The reply then responds to the point (format undecided / skill vs MCP), not to the literal text"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Контекст: я только что сказал пользователю, что для нового движка нужен ANTHROPIC_API_KEY в окружении.\n\nСообщение пользователя (с телефона): «ты он иеть нахрена тебе ключ?»\n\nОтветь пользователю так, как ответил бы в чате. Не пиши код.",
+      "expected_output": "Агент показывает прочтение «ты он и есть, нахрена тебе ключ?» первой строкой, затем отвечает по существу (агент сам и есть модель; ключ был нужен только отдельному процессу).",
+      "expectations": [
+        "The reply states its reading BEFORE answering",
+        "The reading resolves «иеть» as «и есть»",
+        "The reply keeps the user's tone (does not sanitize «нахрена») in the reading",
+        "The reply then answers the substantive point about why a key was needed"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Контекст: мы весь день строили решение, а анализ существующих инструментов не делали; пользователь это заметил.\n\nСообщение пользователя (с телефона): «Вообще строили написать с исследования на предмет аналогов и шаровых решений»\n\nОтветь пользователю так, как ответил бы в чате. Не пиши код.",
+      "expected_output": "Агент показывает прочтение «Вообще стоило начать с исследования на предмет аналогов и готовых/бесплатных решений» до ответа, соглашается и предлагает сделать обзор.",
+      "expectations": [
+        "The reply states its reading (or alternatives) BEFORE reacting",
+        "The reading maps «строили» → «стоило», «написать» → «начать», «шаровых» → «готовых» or «бесплатных»",
+        "The reply then agrees/responds about doing a survey of existing solutions"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Контекст: мы обсуждаем навык interpret; я только что объяснил, что он лежит в .claude/skills и должен подхватиться в этой сессии.\n\nСообщение пользователя (с телефона): «Ты подключилась сюда скилл для дальнейших проверок?»\n\nОтветь пользователю так, как ответил бы в чате. Не пиши код.",
+      "expected_output": "Единственное искажение тривиально («подключилась» → «подключила»), смысл очевиден — но навык требует показать прочтение всё равно, одной строкой, и только потом ответить «да, подключён».",
+      "expectations": [
+        "The reply shows the reading «Ты подключила сюда скилл…» (one line) BEFORE answering, even though the fix is trivial",
+        "The reply does not present a numbered list or ask to choose (confidence is high)",
+        "The reply then answers the actual question (yes, the skill is connected / how)"
+      ]
     }
   ]
 }
