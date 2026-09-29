@@ -1,0 +1,11 @@
+{
+  "name": "interpreter",
+  "owner": { "name": "beatlejute" },
+  "plugins": [
+    {
+      "name": "interpret",
+      "source": "./",
+      "description": "Навык: восстановить, что пользователь имел в виду в искажённом сообщении, и показать прочтение до ответа."
+    }
+  ]
+}

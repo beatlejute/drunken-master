@@ -1,0 +1,10 @@
+{
+  "name": "interpret",
+  "displayName": "interpret",
+  "version": "0.1.0",
+  "description": "Восстанавливает смысл искажённых сообщений (голосовой ввод, T9, свайп, OCR) и показывает прочтение до ответа.",
+  "author": { "name": "beatlejute" },
+  "repository": "https://github.com/beatlejute/interpreter",
+  "license": "MIT",
+  "keywords": ["speech-to-text", "typos", "russian", "asr", "interpretation"]
+}

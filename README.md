@@ -31,28 +31,26 @@
 
 ## Установка
 
-Навык — одна папка: [`.claude/skills/interpret/`](.claude/skills/interpret/).
+**Из репозитория, как плагин** (рекомендуется — обновляется вместе с репо):
 
-**Глобально** (во всех проектах):
-
-```bash
-git clone https://github.com/beatlejute/interpreter
-mkdir -p ~/.claude/skills
-cp -r interpreter/.claude/skills/interpret ~/.claude/skills/interpret
+```
+/plugin marketplace add beatlejute/interpreter
+/plugin install interpret@interpreter
 ```
 
-**В одном проекте**: скопировать ту же папку в `<проект>/.claude/skills/interpret/`.
+Или из терминала: `claude plugin marketplace add beatlejute/interpreter && claude plugin install interpret@interpreter`.
 
-Или установить упакованный [`dist/interpret.skill`](dist/interpret.skill) кнопкой
-«Save skill» в Claude (пересобирается `skill-creator`'ом из той же папки).
+**Вручную**: навык — одна папка [`skills/interpret/`](skills/interpret/).
+Скопировать её в `~/.claude/skills/interpret` (глобально) или в
+`<проект>/.claude/skills/interpret` (для одного проекта). Либо файл
+[`dist/interpret.skill`](dist/interpret.skill) кнопкой «Save skill» в Claude.
 
-Claude Code подхватывает навык при старте сессии. Проверка: в новой сессии
-написать что-нибудь заведомо искажённое — первой строкой должно прийти
-«Понял как: …».
+Проверка: в новой сессии написать что-нибудь заведомо искажённое — первой
+строкой должно прийти «Понял как: …».
 
 ## Как работает
 
-Навык — это процедура из пяти шагов в [`SKILL.md`](.claude/skills/interpret/SKILL.md):
+Навык — это процедура из пяти шагов в [`SKILL.md`](skills/interpret/SKILL.md):
 
 1. **Найти подозрительные слова**: не согласуются с соседями, похожи по звучанию
    на термин из контекста, не являются словами, «странно уместны».
@@ -92,7 +90,7 @@ Claude Code подхватывает навык при старте сессии
 
 Порог самодостаточности навыка — Sonnet-класс. Для Haiku нужен детерминированный
 путь (см. ниже). Подробности итераций — [`docs/NOTES.md`](docs/NOTES.md),
-кейсы и проверки — [`.claude/skills/interpret/evals/evals.json`](.claude/skills/interpret/evals/evals.json).
+кейсы и проверки — [`skills/interpret/evals/evals.json`](skills/interpret/evals/evals.json).
 
 ## Почему навык, а не сервис
 
