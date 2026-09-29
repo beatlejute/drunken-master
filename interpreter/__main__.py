@@ -6,15 +6,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
+import os
 
 from .jev import backend_from_env, FakeJev
 from .pipeline import Interpreter
+from .server import _log_call
 
 
 def main() -> None:
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     ap = argparse.ArgumentParser(description="Interpret a possibly-garbled message.")
     ap.add_argument("message")
     ap.add_argument("--glossary", nargs="*", default=[], help="domain terms")
+    ap.add_argument("--guesses", nargs="*", default=[], help="speculative replacements (marked as such for Jev)")
     ap.add_argument("--context", default=None)
     ap.add_argument("--variants", type=int, default=3)
     ap.add_argument("--json", action="store_true", help="dump full result as JSON")
@@ -24,7 +29,14 @@ def main() -> None:
     if isinstance(backend, FakeJev):
         print("[offline: TYPESAFE_API_KEY not set, using FakeJev]\n")
 
-    result = Interpreter(backend, max_variants=args.variants).interpret(args.message, args.glossary, args.context)
+    result = Interpreter(backend, max_variants=args.variants).interpret(
+        args.message, args.glossary, args.context, guesses=args.guesses
+    )
+    if os.environ.get("INTERPRETER_LOG"):
+        _log_call(
+            {"message": args.message, "glossary": args.glossary, "guesses": args.guesses, "context": args.context, "ignore": None},
+            result.to_dict(),
+        )
     if args.json:
         print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
         return

@@ -119,7 +119,12 @@ class Interpreter:
         cand_objs: dict[int, list[C.Candidate]] = {}
         questions: dict[str, dict] = {}
         for i in idxs:
-            cands = C.generate(tokens, i, glossary + guesses)
+            # Glossary terms need real similarity; guesses are the agent's own
+            # hypotheses for this very message, so a loose match is enough.
+            cands = C.generate(tokens, i, glossary)
+            if guesses:
+                have = {c.text for c in cands}
+                cands += [c for c in C.generate(tokens, i, guesses, min_score=0.35) if c.text not in have]
             if cands:
                 cand_objs[i] = cands
                 options: dict[str, Any] = {}
@@ -128,7 +133,7 @@ class Interpreter:
                     if c.span > 1:
                         desc["replaces"] = " ".join(words[c.start:c.start + c.span])
                     if c.text.lower() in speculative:
-                        desc["note"] = "speculative suggestion by the assistant; pick only if clearly intended"
+                        desc["note"] = "suggested by the assistant from the conversation context"
                     options[c.text] = desc
                 options[KEEP] = f"`{words[i]}` is correct as written"
                 questions[f"fix_{i}"] = choice(
