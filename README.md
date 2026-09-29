@@ -1,0 +1,68 @@
+# interpreter
+
+MCP-сервер, который восстанавливает, что пользователь *имел в виду*, когда
+сообщение пришло с телефона с ошибками speech-to-text, T9 или свайпа.
+Оценочную часть делает [TypeSafe Jev](https://docs.typesafe.ai/) — System One
+модель, которая не генерирует текст, а возвращает вероятности по заданным
+вопросам. Все слова-кандидаты берутся из глоссария, который готовит агент.
+
+## Сценарий общения с моделью
+
+1. Пользователь пишет: `нужно провести до бага и подсмотреть все силы, кажется лиционер отвалился`.
+2. Агент собирает глоссарий из того, что знает (название проекта, тулы, скилы,
+   термины из предыдущих сообщений) и вызывает `interpret_message`.
+3. Сервер:
+   - Jev, один запрос: `Noul` на каждое слово — «это ошибка распознавания?»;
+   - код: для помеченных слов подбирает кандидатов из глоссария
+     (орфографическая + фонетическая близость, склейка соседних токенов
+     `до бага → дебаг`);
+   - Jev, один запрос: `Choice` на каждое слово — «какое слово имелось в виду?»
+     (+ `keep_original`, `none_of_these`);
+   - код: комбинирует распределения в топ-N вариантов предложения;
+   - Jev, один запрос (если вариантов >1): `Choice` между целыми фразами и
+     `Noul` «фраза связна?» на каждую.
+4. Если `needs_clarification == false` — агент работает с `variants[0].text`.
+   Иначе показывает варианты пользователю (`format_clarification`) и ждёт выбора.
+
+## Запуск
+
+```bash
+python -m venv .venv && .venv/bin/pip install -e .[dev]
+export TYPESAFE_API_KEY=...        # без ключа используется FakeJev (оффлайн)
+
+# CLI для ручной проверки
+.venv/bin/python -m interpreter "провести до бага и подсмотреть все силы" \
+    --glossary дебаг скилы лисенер Ванневар --context "агент и его скилы"
+
+# MCP (stdio)
+.venv/bin/python -m interpreter.server
+```
+
+Конфиг для Claude Code / другого MCP-клиента:
+
+```json
+{
+  "mcpServers": {
+    "interpreter": {
+      "command": "/path/to/.venv/bin/python",
+      "args": ["-m", "interpreter.server"],
+      "env": { "TYPESAFE_API_KEY": "..." }
+    }
+  }
+}
+```
+
+## Инструменты
+
+| Tool | Назначение |
+| - | - |
+| `interpret_message(message, glossary, context?, ignore?, max_variants=3)` | Возвращает `variants` (text, probability, changes, jev_preference, coherence), `flagged`, `needs_clarification`. |
+| `format_clarification(variants)` | Форматирует нумерованный вопрос пользователю. |
+
+## Тесты
+
+```bash
+.venv/bin/python -m pytest
+```
+
+Тесты идут на `FakeJev` и не требуют ключа.
