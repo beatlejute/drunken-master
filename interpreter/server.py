@@ -17,6 +17,9 @@ tested end-to-end offline.
 """
 from __future__ import annotations
 
+import json
+import os
+from datetime import datetime, timezone
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
@@ -70,7 +73,25 @@ def interpret_message(
     """
     interp = get_interpreter()
     interp.max_variants = max(1, max_variants)
-    return interp.interpret(message, glossary, context, ignore).to_dict()
+    result = interp.interpret(message, glossary, context, ignore).to_dict()
+    _log_call({"message": message, "glossary": glossary, "context": context, "ignore": ignore}, result)
+    return result
+
+
+def _log_call(request: dict[str, Any], result: dict[str, Any]) -> None:
+    """Append the call to INTERPRETER_LOG (JSONL) so real traffic can become eval cases."""
+    path = os.environ.get("INTERPRETER_LOG")
+    if not path:
+        return
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(
+                {"ts": datetime.now(timezone.utc).isoformat(), "request": request, "result": result, "intended": None},
+                ensure_ascii=False,
+            ) + "\n")
+    except OSError:
+        pass  # logging must never break the tool
 
 
 @mcp.tool()

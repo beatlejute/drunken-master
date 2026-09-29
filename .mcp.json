@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "interpreter": {
+      "command": ".venv/bin/python",
+      "args": ["-m", "interpreter.server"],
+      "env": {
+        "TYPESAFE_API_KEY": "${TYPESAFE_API_KEY}",
+        "INTERPRETER_LOG": "evals/inbox.jsonl"
+      }
+    }
+  }
+}
