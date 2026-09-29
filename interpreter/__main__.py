@@ -31,11 +31,12 @@ def main() -> None:
 
     print(f"original: {result.original}")
     if result.flagged:
-        print("flagged:  " + ", ".join(f"{f.word}(p={f.p_corrupted:.2f})" for f in result.flagged))
+        print("flagged:    " + ", ".join(f"{f.word}(p={f.p_corrupted:.2f})" for f in result.flagged))
+    if result.unresolved:
+        print("unresolved: " + ", ".join(f"{u.word}(p={u.p_corrupted:.2f})" for u in result.unresolved))
     print(f"\n{result.note}\n")
     for i, v in enumerate(result.variants, 1):
-        extra = f" jev={v.jev_preference:.2f} coh={v.coherence:.2f}" if v.jev_preference is not None else ""
-        print(f"{i}. [{v.probability:.2f}{extra}] {v.text}")
+        print(f"{i}. [{v.probability:.2f}] {v.text}")
         for c in v.changes:
             print(f"     {c.original} -> {c.replacement} ({c.probability:.2f})")
 

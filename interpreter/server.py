@@ -54,6 +54,7 @@ def interpret_message(
     glossary: list[str],
     context: str | None = None,
     ignore: list[str] | None = None,
+    guesses: list[str] | None = None,
     max_variants: int = 3,
 ) -> dict[str, Any]:
     """Detect misrecognised words in `message` and reconstruct what the user meant.
@@ -66,15 +67,20 @@ def interpret_message(
         context: short summary of the preceding conversation (keep it small;
             irrelevant text lowers Jev accuracy).
         ignore: words that are definitely correct and should not be checked.
+        guesses: speculative replacements you are not sure about. They are
+            offered to Jev marked as speculative, so a wrong guess is less
+            likely to be applied than a glossary term.
         max_variants: how many alternative readings to return.
 
-    Returns a dict with `variants` (each: text, probability, changes,
-    jev_preference, coherence), `flagged` words, and `needs_clarification`.
+    Returns a dict with `variants` (each: text, probability, changes),
+    `flagged` words, `unresolved` words (look garbled but nothing in the
+    glossary matches — extend the glossary and call again) and
+    `needs_clarification`.
     """
     interp = get_interpreter()
     interp.max_variants = max(1, max_variants)
-    result = interp.interpret(message, glossary, context, ignore).to_dict()
-    _log_call({"message": message, "glossary": glossary, "context": context, "ignore": ignore}, result)
+    result = interp.interpret(message, glossary, context, ignore, guesses).to_dict()
+    _log_call({"message": message, "glossary": glossary, "guesses": guesses, "context": context, "ignore": ignore}, result)
     return result
 
 

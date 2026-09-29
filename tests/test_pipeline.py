@@ -23,6 +23,26 @@ def test_phonetic_match():
     assert C.similarity("Анвар", "Ванневар") >= 0.6
 
 
+def test_cross_script_match():
+    assert C.similarity("мцп", "MCP") >= 0.6
+    assert C.similarity("лисинер", "listener") >= 0.6
+    assert C.similarity("дебак", "debug") >= 0.6
+
+
+def test_unresolved_reported_when_no_candidates():
+    class Suspicious(FakeJev):
+        def ask(self, state, questions):
+            out = super().ask(state, questions)
+            for k in out:
+                if k.startswith("sus_"):
+                    out[k]["noul"] = 0.9
+            return out
+    result = Interpreter(Suspicious()).interpret("публикация из гриха", ["npm"])
+    assert [u.word for u in result.unresolved] == ["публикация", "гриха"]
+    assert result.variants[0].text == "публикация из гриха"
+    assert not result.needs_clarification
+
+
 def test_end_to_end_offline():
     fake = FakeJev()
     result = Interpreter(fake).interpret(MESSAGE, GLOSSARY, context="обсуждаем агента и его скилы")
@@ -32,8 +52,7 @@ def test_end_to_end_offline():
     assert "лисенер" in top
     assert "Ванневар" in top
     assert result.variants[0].probability > 0
-    # steps 1, 2 and (since >1 variants) 4 each made exactly one Jev call
-    assert len(fake.calls) in (2, 3)
+    assert len(fake.calls) == 1  # everything goes to Jev in a single request
 
 
 def test_clean_message_short_circuits():

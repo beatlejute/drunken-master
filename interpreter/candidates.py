@@ -38,8 +38,29 @@ _PHONETIC_RU = [
 ]
 
 
-def phonetic_key(word: str) -> str:
+# Rough Latin -> Cyrillic transliteration so "MCP"/"мцп", "debug"/"дебак",
+# "listener"/"лисенер" compare in one alphabet. Multi-letter rules first.
+_TRANSLIT = [
+    ("sch", "ш"), ("sh", "ш"), ("ch", "ч"), ("th", "т"), ("ph", "ф"), ("ck", "к"),
+    ("ee", "и"), ("oo", "у"), ("ea", "и"), ("ou", "ау"), ("qu", "кв"),
+    ("a", "а"), ("b", "б"), ("c", "к"), ("d", "д"), ("e", "е"), ("f", "ф"), ("g", "г"),
+    ("h", "х"), ("i", "и"), ("j", "дж"), ("k", "к"), ("l", "л"), ("m", "м"), ("n", "н"),
+    ("o", "о"), ("p", "п"), ("q", "к"), ("r", "р"), ("s", "с"), ("t", "т"), ("u", "у"),
+    ("v", "в"), ("w", "в"), ("x", "кс"), ("y", "и"), ("z", "з"),
+]
+
+
+def transliterate(word: str) -> str:
     w = word.lower()
+    if not re.search(r"[a-z]", w):
+        return w
+    for src, dst in _TRANSLIT:
+        w = w.replace(src, dst)
+    return w
+
+
+def phonetic_key(word: str) -> str:
+    w = transliterate(word)
     for pat, rep in _PHONETIC_RU:
         w = re.sub(pat, rep, w)
     return w
@@ -49,8 +70,9 @@ def similarity(a: str, b: str) -> float:
     """0..1 — max of raw and phonetic similarity."""
     a, b = a.lower(), b.lower()
     raw = fuzz.ratio(a, b) / 100.0
+    lit = fuzz.ratio(transliterate(a), transliterate(b)) / 100.0
     phon = fuzz.ratio(phonetic_key(a), phonetic_key(b)) / 100.0
-    return max(raw, phon)
+    return max(raw, lit, phon)
 
 
 @dataclass(frozen=True)

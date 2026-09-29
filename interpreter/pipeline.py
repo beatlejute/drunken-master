@@ -1,12 +1,21 @@
 """Interpretation pipeline.
 
-    message ──► tokenize ──► Jev: noul per word ("is this misrecognized?")
-            ──► code: candidates from glossary ──► Jev: choice per flagged word
+    message ──► tokenize ──► code: glossary candidates per word (fuzzy + phonetic
+            + transliteration + adjacent-token merge)
+            ──► Jev, ONE request:
+                  Choice per word that has candidates: {candidates…, keep_original}
+                  Noul  per word that has none:       "is this misrecognised?" (→ unresolved)
             ──► code: beam over per-word distributions ──► top-k variants
-            ──► (k>1) Jev: choice over variants + noul "coherent?" per variant
+            ──► code: needs_clarification from the top variant's probability
 
 Jev never generates text; all wording comes from the glossary the caller
 (the agent) supplies. Arithmetic stays in code, per the Jev guidance.
+
+Why no separate "is this word corrupted?" step: a bare yes/no on a word sat
+around 0.5 for real errors and flipped between runs, while a Choice that shows
+Jev the concrete replacement ("дебак" vs "дебаг") is stable. Why no final
+Choice between whole sentences: it disagreed with the per-word answers and
+mostly preferred the untouched text.
 """
 from __future__ import annotations
 
@@ -18,12 +27,11 @@ from . import candidates as C
 from .jev import JevBackend, choice, noul, strip_hints, FakeJev
 
 KEEP = "keep_original"
-NONE = "none_of_these"
 
 
 @dataclass
 class Change:
-    position: int          # token index
+    position: int          # first token index replaced
     original: str
     replacement: str
     probability: float
@@ -34,16 +42,26 @@ class Variant:
     text: str
     probability: float               # product of per-word probabilities, renormalised
     changes: list[Change] = field(default_factory=list)
-    jev_preference: float | None = None   # from the final Choice over variants
-    coherence: float | None = None        # from the final Noul per variant
 
 
 @dataclass
 class Flagged:
+    """A word Jev thinks was misrecognised and for which we had a replacement."""
+    position: int
+    word: str
+    p_corrupted: float               # 1 - P(keep_original)
+    candidates: list[str]
+
+
+@dataclass
+class Unresolved:
+    """A word Jev thinks was misrecognised but the glossary offers nothing for.
+
+    The agent should extend `glossary` (or `guesses`) and call again.
+    """
     position: int
     word: str
     p_corrupted: float
-    candidates: list[str]
 
 
 @dataclass
@@ -51,6 +69,7 @@ class Interpretation:
     original: str
     variants: list[Variant]
     flagged: list[Flagged]
+    unresolved: list[Unresolved]
     needs_clarification: bool
     note: str = ""
 
@@ -65,14 +84,13 @@ class Interpreter:
         *,
         corrupted_threshold: float = 0.5,
         max_variants: int = 3,
-        auto_apply_confidence: float = 0.8,
+        auto_apply_confidence: float = 0.75,
     ):
         self.backend = backend
         self.corrupted_threshold = corrupted_threshold
         self.max_variants = max_variants
         self.auto_apply_confidence = auto_apply_confidence
 
-    # -- Jev call wrapper -------------------------------------------------
     def _ask(self, state: Any, questions: dict[str, dict]) -> dict[str, dict]:
         if not questions:
             return {}
@@ -80,96 +98,102 @@ class Interpreter:
             return self.backend.ask(state, questions)
         return self.backend.ask(state, strip_hints(questions))
 
-    # -- main entry ----------------------------------------------------------
     def interpret(
         self,
         message: str,
         glossary: list[str],
         context: str | None = None,
         ignore: list[str] | None = None,
+        guesses: list[str] | None = None,
     ) -> Interpretation:
         tokens = C.tokenize(message)
         words = [t.text for t in tokens]
         idxs = C.checkable_indices(tokens, set(ignore or []))
-        state: dict[str, Any] = {"message": message, "tokens": words, "glossary": glossary}
+        guesses = [g for g in (guesses or []) if g not in glossary]
+        speculative = {g.lower() for g in guesses}
+        state: dict[str, Any] = {"message": message, "tokens": words, "glossary": glossary + guesses}
         if context:
             state["context"] = context
 
-        # Step 1: which words look misrecognised?
-        q1 = {}
+        # Candidates in code. Words with candidates get a Choice, others a Noul.
+        cand_objs: dict[int, list[C.Candidate]] = {}
+        questions: dict[str, dict] = {}
         for i in idxs:
-            q1[f"tok_{i}"] = noul(
-                {
-                    "position": i,
-                    "word": words[i],
-                    "question": (
-                        "Is `word` at `tokens[position]` in `message` a misrecognition "
-                        "(speech-to-text, T9 autocorrect or swipe typing error) where the user "
-                        "meant a different word — in particular one of the terms in `glossary`?"
-                    ),
-                },
-                true="the word does not fit its neighbours and resembles another word in sound or spelling",
-                false="the word is appropriate in this context as written",
-            )
-            q1[f"tok_{i}"]["_fake_hint"] = C.best_glossary_score(tokens, i, glossary)
-        a1 = self._ask(state, q1)
+            cands = C.generate(tokens, i, glossary + guesses)
+            if cands:
+                cand_objs[i] = cands
+                options: dict[str, Any] = {}
+                for c in cands:
+                    desc: dict[str, Any] = {"_fake_score": c.score}
+                    if c.span > 1:
+                        desc["replaces"] = " ".join(words[c.start:c.start + c.span])
+                    if c.text.lower() in speculative:
+                        desc["note"] = "speculative suggestion by the assistant; pick only if clearly intended"
+                    options[c.text] = desc
+                options[KEEP] = f"`{words[i]}` is correct as written"
+                questions[f"fix_{i}"] = choice(
+                    {
+                        "position": i,
+                        "original": words[i],
+                        "question": (
+                            "The user typed `message` on a phone; speech-to-text, T9 and swipe "
+                            "errors are possible. Which word did they actually mean at "
+                            "`tokens[position]`, given `context` and `glossary`? The other options "
+                            f"are candidate replacements; `{KEEP}` means the original word is right."
+                        ),
+                    },
+                    options,
+                )
+            else:
+                questions[f"sus_{i}"] = noul(
+                    {
+                        "position": i,
+                        "word": words[i],
+                        "question": (
+                            "Is `word` at `tokens[position]` in `message` a misrecognition "
+                            "(speech-to-text, T9 or swipe error) where the user meant a different word?"
+                        ),
+                    },
+                    true="the word does not fit its neighbours and looks like a garbled version of another word",
+                    false="the word is appropriate in this context as written",
+                )
+                questions[f"sus_{i}"]["_fake_hint"] = 0.0
+        answers = self._ask(state, questions)
 
-        flagged: list[Flagged] = []
-        for i in idxs:
-            p = a1[f"tok_{i}"]["noul"]
-            if p >= self.corrupted_threshold:
-                cands = C.generate(tokens, i, glossary)
-                flagged.append(Flagged(i, words[i], p, [c.text for c in cands]))
+        unresolved = [
+            Unresolved(i, words[i], answers[f"sus_{i}"]["noul"])
+            for i in idxs if f"sus_{i}" in answers and answers[f"sus_{i}"]["noul"] >= self.corrupted_threshold
+        ]
 
-        if not flagged:
-            return Interpretation(message, [Variant(message, 1.0)], [], False, "no corrupted words detected")
-
-        # Step 2: pick the intended word for each flagged position.
-        cand_objs: dict[int, list[C.Candidate]] = {f.position: C.generate(tokens, f.position, glossary) for f in flagged}
-        q2 = {}
-        for f in flagged:
-            options: dict[str, Any] = {}
-            for c in cand_objs[f.position]:
-                desc: dict[str, Any] = {"_fake_score": c.score}
-                if c.span > 1:
-                    desc["replaces"] = " ".join(words[c.start:c.start + c.span])
-                options[c.text] = desc
-            options[KEEP] = "the word is correct as written"
-            options[NONE] = "the user meant a word not listed here"
-            q2[f"fix_{f.position}"] = choice(
-                {
-                    "position": f.position,
-                    "original": f.word,
-                    "question": (
-                        "Which word did the user actually mean at `tokens[position]` in `message`, "
-                        "given `context` and `glossary`? Options are candidate replacements; "
-                        f"`{KEEP}` means the original word is right."
-                    ),
-                },
-                options,
-            )
-        a2 = self._ask(state, q2)
-
-        # Step 3: combine in code — beam over independent per-word distributions.
         # option = (text, start, span, prob); the "keep" option has text == original word
-        per_pos: list[tuple[int, list[tuple[str, int, int, float]]]] = []
-        for f in flagged:
-            probs = a2[f"fix_{f.position}"]["probabilities"]
-            where = {c.text: (c.start, c.span) for c in cand_objs[f.position]}
-            opts = [(words[f.position], f.position, 1, probs.get(KEEP, 0.0) + probs.get(NONE, 0.0))]
+        flagged: list[Flagged] = []
+        per_pos: list[list[tuple[str, int, int, float]]] = []
+        for i, cands in cand_objs.items():
+            probs = answers[f"fix_{i}"]["probabilities"]
+            p_keep = probs.get(KEEP, 0.0)
+            if 1.0 - p_keep < self.corrupted_threshold:
+                continue
+            where = {c.text: (c.start, c.span) for c in cands}
+            flagged.append(Flagged(i, words[i], 1.0 - p_keep, [c.text for c in cands]))
+            opts = [(words[i], i, 1, p_keep)]
             opts += [(t, *where[t], p) for t, p in probs.items() if t in where]
             opts.sort(key=lambda o: o[3], reverse=True)
-            per_pos.append((f.position, opts[: self.max_variants + 1]))
+            per_pos.append(opts[: self.max_variants + 1])
+
+        if not flagged:
+            note = "no corrupted words detected" if not unresolved else \
+                "suspicious words found but the glossary has no replacement for them — see `unresolved`"
+            return Interpretation(message, [Variant(message, 1.0)], [], unresolved, False, note)
 
         variants: list[Variant] = []
-        for combo in itertools.product(*[o for _, o in per_pos]):
+        for combo in itertools.product(*per_pos):
             prob = 1.0
             replacements: dict[int, tuple[str, int]] = {}
             changes: list[Change] = []
             covered: set[int] = set()
-            for (pos, _), (text, start, span, p) in zip(per_pos, combo):
+            for f, (text, start, span, p) in zip(flagged, combo):
                 prob *= p
-                if text == words[pos]:
+                if text == words[f.position]:
                     continue
                 rng = set(range(start, start + span))
                 if rng & covered:          # two fixes claim the same token — impossible reading
@@ -177,11 +201,10 @@ class Interpreter:
                     break
                 covered |= rng
                 replacements[start] = (text, span)
-                changes.append(Change(pos, " ".join(words[start:start + span]), text, p))
+                changes.append(Change(start, " ".join(words[start:start + span]), text, p))
             if prob > 0:
                 variants.append(Variant(_render(message, tokens, replacements), prob, changes))
 
-        # merge identical renderings, normalise, cut
         merged: dict[str, Variant] = {}
         for v in variants:
             if v.text in merged:
@@ -193,38 +216,11 @@ class Interpreter:
         for v in variants:
             v.probability /= total
 
-        # Step 4: let Jev compare whole sentences when there is a real choice.
-        if len(variants) > 1:
-            vstate = {"original": message, "variants": [v.text for v in variants]}
-            if context:
-                vstate["context"] = context
-            q3: dict[str, dict] = {
-                "best": choice(
-                    "Which of `variants` is the sentence the user most likely intended when they "
-                    "produced `original` (a message with possible speech-to-text / autocorrect errors)?",
-                    {str(i): {"_fake_score": v.probability} for i, v in enumerate(variants)},
-                )
-            }
-            for i in range(len(variants)):
-                q3[f"coherent_{i}"] = noul(
-                    {"index": i, "question": "Is `variants[index]` a coherent, meaningful sentence given `context`?"}
-                )
-                q3[f"coherent_{i}"]["_fake_hint"] = 1.0
-            a3 = self._ask(vstate, q3)
-            for i, v in enumerate(variants):
-                v.jev_preference = a3["best"]["probabilities"][str(i)]
-                v.coherence = a3[f"coherent_{i}"]["noul"]
-            variants.sort(key=lambda v: (v.jev_preference or 0) * v.probability, reverse=True)
-            top_conf = a3["best"]["confidence"]
-        else:
-            top_conf = 1.0
-
-        needs_clarification = len(variants) > 1 and top_conf < self.auto_apply_confidence
-        note = (
-            "ambiguous — ask the user to choose" if needs_clarification
-            else "top variant is confident enough to apply"
-        )
-        return Interpretation(message, variants, flagged, needs_clarification, note)
+        needs_clarification = len(variants) > 1 and variants[0].probability < self.auto_apply_confidence
+        note = "ambiguous — ask the user to choose" if needs_clarification else "top variant is confident enough to apply"
+        if unresolved:
+            note += "; some suspicious words had no glossary match — see `unresolved`"
+        return Interpretation(message, variants, flagged, unresolved, needs_clarification, note)
 
 
 def _render(message: str, tokens: list[C.Token], replacements: dict[int, tuple[str, int]]) -> str:
