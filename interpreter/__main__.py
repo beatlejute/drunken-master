@@ -9,8 +9,8 @@ import json
 import logging
 import os
 
-from .jev import backend_from_env, FakeJev
-from .pipeline import Interpreter
+from .engines import make_engine
+from .jev import FakeJev
 from .server import _log_call
 
 
@@ -22,25 +22,26 @@ def main() -> None:
     ap.add_argument("--guesses", nargs="*", default=[], help="speculative replacements (marked as such for Jev)")
     ap.add_argument("--context", default=None)
     ap.add_argument("--variants", type=int, default=3)
+    ap.add_argument("--engine", choices=["claude", "jev"], default=None, help="default: claude if ANTHROPIC_API_KEY is set, else jev")
     ap.add_argument("--json", action="store_true", help="dump full result as JSON")
     args = ap.parse_args()
 
-    backend = backend_from_env()
-    if isinstance(backend, FakeJev):
+    engine = make_engine(args.engine, max_variants=args.variants)
+    if isinstance(getattr(engine, "backend", None), FakeJev):
         print("[offline: TYPESAFE_API_KEY not set, using FakeJev]\n")
 
-    result = Interpreter(backend, max_variants=args.variants).interpret(
-        args.message, args.glossary, args.context, guesses=args.guesses
-    )
+    result = engine.interpret(args.message, args.glossary, args.context, guesses=args.guesses)
     if os.environ.get("INTERPRETER_LOG"):
         _log_call(
-            {"message": args.message, "glossary": args.glossary, "guesses": args.guesses, "context": args.context, "ignore": None},
+            {"message": args.message, "glossary": args.glossary, "guesses": args.guesses, "context": args.context, "ignore": None,
+             "engine": type(engine).__name__},
             result.to_dict(),
         )
     if args.json:
         print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
         return
 
+    print(f"engine:   {type(engine).__name__}")
     print(f"original: {result.original}")
     if result.flagged:
         print("flagged:    " + ", ".join(f"{f.word}(p={f.p_corrupted:.2f})" for f in result.flagged))

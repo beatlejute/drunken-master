@@ -76,3 +76,36 @@ def test_case_preserved():
     toks = C.tokenize("Анвар сломался")
     from interpreter.pipeline import _render
     assert _render("Анвар сломался", toks, {0: ("ванневар", 1)}) == "Ванневар сломался"
+
+
+def test_claude_engine_maps_structured_output():
+    from interpreter.claude_engine import ClaudeEngine, Reconstruction, VariantOut, ChangeOut
+
+    eng = ClaudeEngine(client=object())  # never called here
+    out = Reconstruction(
+        variants=[
+            VariantOut(text="Нет, общение и тесты теперь будем проводить здесь", confidence=0.6,
+                       changes=[ChangeOut(original="Некто", replacement="Нет", reason="ASR"),
+                                ChangeOut(original="обременение", replacement="общение", reason="ASR"),
+                                ChangeOut(original="задачи", replacement="здесь", reason="ASR")]),
+            VariantOut(text="Некто обременение и тесты теперь будем проводить задачи", confidence=0.4, changes=[]),
+        ],
+        unresolved=["бегать"],
+    )
+    res = eng._to_interpretation("Некто обременение и тесты теперь будем проводить задачи", out)
+    assert res.variants[0].text.startswith("Нет, общение")
+    assert abs(res.variants[0].probability - 0.6) < 1e-9
+    assert [f.word for f in res.flagged] == ["Некто", "обременение", "задачи"]
+    assert res.flagged[0].position == 0 and res.flagged[2].position == 7
+    assert res.unresolved[0].word == "бегать"
+    assert res.needs_clarification  # 0.6 < 0.75
+
+
+def test_engine_selection_falls_back_to_jev(monkeypatch):
+    from interpreter.engines import default_engine_name
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("INTERPRETER_ENGINE", raising=False)
+    assert default_engine_name() == "jev"
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
+    assert default_engine_name() == "claude"

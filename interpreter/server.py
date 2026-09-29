@@ -24,8 +24,7 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
-from .jev import backend_from_env
-from .pipeline import Interpreter
+from .engines import Engine, make_engine
 
 mcp = MCPServer(
     "interpreter",
@@ -38,14 +37,15 @@ mcp = MCPServer(
     ),
 )
 
-_interpreter: Interpreter | None = None
+_engines: dict[str, Engine] = {}
 
 
-def get_interpreter() -> Interpreter:
-    global _interpreter
-    if _interpreter is None:
-        _interpreter = Interpreter(backend_from_env())
-    return _interpreter
+def get_engine(name: str | None = None) -> Engine:
+    from .engines import default_engine_name
+    name = name or default_engine_name()
+    if name not in _engines:
+        _engines[name] = make_engine(name)
+    return _engines[name]
 
 
 @mcp.tool()
@@ -56,6 +56,7 @@ def interpret_message(
     ignore: list[str] | None = None,
     guesses: list[str] | None = None,
     max_variants: int = 3,
+    engine: str | None = None,
 ) -> dict[str, Any]:
     """Detect misrecognised words in `message` and reconstruct what the user meant.
 
@@ -71,16 +72,19 @@ def interpret_message(
             offered to Jev marked as speculative, so a wrong guess is less
             likely to be applied than a glossary term.
         max_variants: how many alternative readings to return.
+        engine: "claude" (generative, default when available) or "jev".
 
     Returns a dict with `variants` (each: text, probability, changes),
     `flagged` words, `unresolved` words (look garbled but nothing in the
     glossary matches — extend the glossary and call again) and
     `needs_clarification`.
     """
-    interp = get_interpreter()
-    interp.max_variants = max(1, max_variants)
-    result = interp.interpret(message, glossary, context, ignore, guesses).to_dict()
-    _log_call({"message": message, "glossary": glossary, "guesses": guesses, "context": context, "ignore": ignore}, result)
+    eng = get_engine(engine)
+    eng.max_variants = max(1, max_variants)
+    result = eng.interpret(message, glossary, context, ignore, guesses).to_dict()
+    result["engine"] = engine or type(eng).__name__
+    _log_call({"message": message, "glossary": glossary, "guesses": guesses, "context": context, "ignore": ignore,
+               "engine": result["engine"]}, result)
     return result
 
 
