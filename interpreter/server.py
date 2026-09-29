@@ -88,7 +88,7 @@ def interpret_message(
     return result
 
 
-def _log_call(request: dict[str, Any], result: dict[str, Any]) -> None:
+def _log_call(request: dict[str, Any], result: dict[str, Any], intended: str | None = None) -> None:
     """Append the call to INTERPRETER_LOG (JSONL) so real traffic can become eval cases."""
     path = os.environ.get("INTERPRETER_LOG")
     if not path:
@@ -97,11 +97,42 @@ def _log_call(request: dict[str, Any], result: dict[str, Any]) -> None:
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         with open(path, "a", encoding="utf-8") as f:
             f.write(json.dumps(
-                {"ts": datetime.now(timezone.utc).isoformat(), "request": request, "result": result, "intended": None},
+                {"ts": datetime.now(timezone.utc).isoformat(), "request": request, "result": result, "intended": intended},
                 ensure_ascii=False,
             ) + "\n")
     except OSError:
         pass  # logging must never break the tool
+
+
+@mcp.tool()
+def record_interpretation(
+    message: str,
+    variants: list[dict[str, Any]],
+    chosen: str | None = None,
+    engine: str = "agent",
+) -> dict[str, Any]:
+    """Record an interpretation the agent made itself (see .claude/skills/interpret).
+
+    Args:
+        message: the raw user message.
+        variants: list of {"text": str, "confidence": float, "changes": [{"original","replacement"}]},
+            most likely first.
+        chosen: the reading the user confirmed (or typed), once known. Call again
+            with it after the user answers; the log keeps both rows.
+        engine: who produced the variants; "agent" by default.
+
+    Everything lands in INTERPRETER_LOG as eval data: `intended` is filled from
+    `chosen` when given.
+    """
+    top = variants[0]["confidence"] if variants else 1.0
+    result = {
+        "original": message,
+        "variants": [{"text": v.get("text"), "probability": v.get("confidence"), "changes": v.get("changes", [])} for v in variants],
+        "needs_clarification": len(variants) > 1 and top < 0.75,
+        "engine": engine,
+    }
+    _log_call({"message": message, "engine": engine}, result, intended=chosen)
+    return {"recorded": True, "intended": chosen}
 
 
 @mcp.tool()

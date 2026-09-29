@@ -113,6 +113,7 @@ def generate(
     *,
     min_score: float = 0.6,
     limit: int = 6,
+    merge_min_score: float = 0.6,
 ) -> list[Candidate]:
     """Glossary terms similar to tokens[index], or to it merged with a neighbour.
 
@@ -138,7 +139,11 @@ def generate(
             continue
         for text, start, span in windows:
             s = similarity(text, term)
-            if s >= min_score and s > found.get(term, Candidate(term, start, span, -1.0)).score:
+            # merged windows must clear the stricter bar: a loose match that
+            # swallows a neighbour ("Некто обременение" -> "общение") is worse than none
+            if s < (merge_min_score if span > 1 else min_score):
+                continue
+            if s > found.get(term, Candidate(term, start, span, -1.0)).score:
                 found[term] = Candidate(term, start, span, s)
 
     return sorted(found.values(), key=lambda c: c.score, reverse=True)[:limit]
