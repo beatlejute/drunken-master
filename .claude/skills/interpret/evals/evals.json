@@ -1,0 +1,52 @@
+{
+  "skill_name": "interpret",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Контекст: мы обсуждаем проект interpreter — MCP-сервер, который восстанавливает искажённые сообщения; движок сейчас Jev (TypeSafe), но качество не устраивает.\n\nСообщение пользователя (с телефона): «Меня интересует максимальная эффективность я даже не держусь за Джейн»\n\nОтветь пользователю так, как ответил бы в чате. Не пиши код.",
+      "expected_output": "Агент читает «Джейн» как Jev, одной строкой показывает прочтение и отвечает по существу (не держимся за Jev → можно менять движок). Не спрашивает уточнения — уверенность высокая.",
+      "files": [],
+      "expectations": [
+        "The reply states its reading of the message (e.g. 'Понял как: …' or explicitly says Джейн → Jev) BEFORE any substantive answer about engines/Jev/efficiency",
+        "The reading maps «Джейн» to Jev",
+        "The reply does not present a numbered list of alternatives or ask the user to choose (confidence is high here)",
+        "After the reading, the reply answers the user's point (we are not tied to Jev / can change the engine)"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Контекст: мы обсуждали, где тестировать MCP-сервер — в этой облачной сессии или в отдельной. Я только что предложил открыть новую сессию, пользователь не хочет терять контекст.\n\nСообщение пользователя (с телефона): «Некто обременение и тесты теперь будут проводить задачи чтобы не бегать»\n\nОтветь пользователю так, как ответил бы в чате. Не пиши код.",
+      "expected_output": "Агент замечает три искажения (Некто←Нет, обременение←общение, задачи←здесь), даёт 2–3 прочтения с топом «Нет, общение и тесты теперь будем проводить здесь, чтобы не бегать», и просит выбрать, потому что уверенность низкая. Не действует по буквальному тексту.",
+      "files": [],
+      "expectations": [
+        "The reply presents 2 or more alternative readings as a numbered list BEFORE any substantive reaction to the message",
+        "The top (first) reading replaces Некто→Нет, обременение→общение and задачи→здесь (i.e. 'Нет, общение и тесты теперь будем проводить здесь, чтобы не бегать' or equivalent)",
+        "The reply asks the user to pick a reading (or confirm) and does not proceed as if one reading were certain",
+        "The reply does not treat 'обременение' or 'задачи' as literally intended words (no discussion of burdens or tasks)"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Контекст: мы строим навык для восстановления искажённых сообщений; я только что объяснил, что глоссарий терминов нужен Jev, а не агенту.\n\nСообщение пользователя (с телефона): «Сезонная возможность что нам придётся косить очень большой соврать или это не будет работать в таком виде?»\n\nОтветь пользователю так, как ответил бы в чате. Не пиши код.",
+      "expected_output": "Агент восстанавливает «Есть ли вероятность, что нам придётся собрать очень большой словарь, или это не будет работать в таком виде?», показывает прочтение и отвечает на вопрос про словарь. Может задать уточнение, но прочтение со словом «словарь» должно быть первым.",
+      "files": [],
+      "expectations": [
+        "The reply states its reading BEFORE answering the question",
+        "The first/top reading contains «словарь» (соврать → словарь) and reads as a question about whether a very large dictionary is needed",
+        "The reply answers the question about dictionary size (e.g. explains a large dictionary is not needed / what is needed instead)",
+        "No word that was correct in the original ('очень большой', 'в таком виде', 'не будет работать') is changed in the reading"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Контекст: мы правим тесты в проекте interpreter.\n\nСообщение пользователя (с телефона): «запусти тесты, потом коммит»\n\nОтветь пользователю так, как ответил бы в чате. Не выполняй команды, только скажи, что сделаешь.",
+      "expected_output": "Сообщение чистое: агент не упоминает опечатки, не предлагает прочтений, просто отвечает по делу.",
+      "files": [],
+      "expectations": [
+        "The reply does not mention typos, misrecognition, alternative readings, or 'понял как'",
+        "The reply simply says it will run the tests and then commit",
+        "The reply does not ask any clarification question"
+      ]
+    }
+  ]
+}
