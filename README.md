@@ -42,7 +42,7 @@ was built and tested on Russian and English.
 
 From a terminal: `claude plugin marketplace add beatlejute/drunken-master && claude plugin install drunken-master@drunken-master`.
 
-**Manually**: the skill is a single folder, [`skills/drunken-master/`](skills/drunken-master/).
+**Manually**: the skill is a single folder, [`plugin/skills/drunken-master/`](plugin/skills/drunken-master/).
 Copy it to `~/.claude/skills/drunken-master` (all projects) or to
 `<project>/.claude/skills/drunken-master` (one project).
 
@@ -51,7 +51,7 @@ of the reply should be `Read as: …`.
 
 ## How it works
 
-The skill is a five-step procedure in [`SKILL.md`](skills/drunken-master/SKILL.md):
+The skill is a five-step procedure in [`SKILL.md`](plugin/skills/drunken-master/SKILL.md):
 
 1. **Find suspicious words** — ones that disagree with their neighbours, sound
    like a term from context, are not words at all, or are real words that do
@@ -92,7 +92,7 @@ Runs were independent agents that saw only `SKILL.md`.
 
 The skill is self-sufficient from Sonnet class up. Iteration history:
 [`docs/NOTES.md`](docs/NOTES.md); cases and assertions:
-[`skills/drunken-master/evals/evals.json`](skills/drunken-master/evals/evals.json).
+[`plugin/skills/drunken-master/evals/evals.json`](plugin/skills/drunken-master/evals/evals.json).
 
 ## Why a skill and not a service
 
@@ -109,12 +109,14 @@ The helper server survives as a development tool — [`docs/mcp-server.md`](docs
 it logs readings into the eval set, compares engines, and offers a
 deterministic path for weaker models. Nothing in the plugin depends on it.
 
-## What the plugin runs
+## Repository layout
 
-Nothing. The plugin is one Markdown skill file. It makes no network calls,
-runs no scripts, installs no packages and touches no settings. The Python
-package in this repository (`interpreter/`) is a separate development helper
-and is not part of the plugin.
+- [`plugin/`](plugin/) — **the published plugin**: the skill, its README, license and
+  icon. Nothing else ships. It makes no network calls, runs no scripts,
+  installs no packages and touches no settings.
+- `interpreter/`, `dev/`, `tests/`, `evals/` — development helper: an MCP server
+  that logs readings into the eval set and compares engines. Not part of the plugin.
+- `docs/` — notes, engine docs, survey of alternatives.
 
 ## Development
 
@@ -122,7 +124,7 @@ and is not part of the plugin.
 python -m venv .venv && .venv/bin/pip install -e .[dev]
 .venv/bin/python -m pytest                      # helper server mechanics
 .venv/bin/python -m interpreter.eval -v         # compare engines on labelled cases
-claude plugin validate .                        # plugin manifest / skill checks
+claude plugin validate plugin                      # plugin manifest / skill checks
 ```
 
 To use the helper MCP server in this repo: `claude --mcp-config dev/mcp.json`.

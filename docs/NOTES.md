@@ -18,7 +18,7 @@ the agent runs itself.
   available, holds the conversation context and needs no key. Live tests showed
   the bottleneck was hypothesis generation, not choice: "encumbrance" →
   "communication" needs meaning, not a dictionary. The skill lives in
-  `skills/drunken-master/`; the MCP server (`interpreter/`) stays as a dev tool.
+  `plugin/skills/drunken-master/`; the MCP server (`interpreter/`) stays as a dev tool.
 - **Jev pipeline: one request.** Earlier there were three (per-word Noul "is it
   garbled?" → Choice → Choice between whole sentences). The Noul sat near 0.5 and
   flipped between runs; the sentence-level Choice contradicted the per-word
@@ -44,7 +44,7 @@ the agent runs itself.
 
 ## Skill iterations (skill-creator)
 
-Cases: `skills/drunken-master/evals/evals.json` (12: 9 real messages from live
+Cases: `plugin/skills/drunken-master/evals/evals.json` (12: 9 real messages from live
 sessions, 3 English, clean controls). Runs are independent subagents that see
 only `SKILL.md`.
 

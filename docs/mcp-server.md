@@ -1,6 +1,6 @@
 # Helper MCP server `interpreter` (development tool)
 
-> The product of this repository is the [Drunken Master skill](../skills/drunken-master/SKILL.md);
+> The product of this repository is the [Drunken Master skill](../plugin/skills/drunken-master/SKILL.md);
 > see the [README](../README.md). The server and engines below are for logging
 > eval data, comparing engines, and as a deterministic path for weaker models.
 > They are **not** part of the plugin and are not installed with it.
