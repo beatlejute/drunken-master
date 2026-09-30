@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "interpreter": {
-      "command": ".venv/bin/python",
+      "command": "${CLAUDE_PROJECT_DIR}/.venv/bin/python",
       "args": ["-m", "interpreter.server"],
       "env": {
         "TYPESAFE_API_KEY": "${TYPESAFE_API_KEY}",

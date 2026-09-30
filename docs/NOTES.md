@@ -1,113 +1,85 @@
-# Рабочие заметки (контекст для следующей сессии)
+# Working notes
 
-Обновлять при каждом существенном решении. Читать вместе с `CLAUDE.md` и `README.md`.
+Decisions, observed error classes and open problems. Read with `CLAUDE.md` and
+`README.md`.
 
-## Что это и зачем
+## What this is
 
-Пользователь пишет агенту с телефона; ASR/T9/свайп искажают слова, особенно
-термины («лиционер» ← «лисенер», «до бага» ← «дебаг», «Анвар» ← «Ванневар»).
-MCP-сервер восстанавливает задуманное. Оценивает [TypeSafe Jev](https://docs.typesafe.ai/) —
-System One модель: не генерирует текст, только выбирает из вариантов и
-возвращает вероятности. Поэтому **кандидатов на замену даёт код/агент, Jev
-только выбирает**.
+Users write to agents from phones and by voice; ASR, autocorrect and swipe
+distort words, terms especially («лиционер» ← «лисенер», «до бага» ← «дебаг»,
+"sea eye" ← CI). The project recovers what was meant. It began as an MCP server
+on [TypeSafe Jev](https://docs.typesafe.ai/) — a System One model that only
+chooses among given options and returns probabilities — and ended as a skill
+the agent runs itself.
 
-## Решения и почему
+## Decisions and why
 
-- **Один запрос к Jev.** Раньше было три (Noul «испорчено?» → Choice → Choice
-  между фразами). Noul «испорчено ли слово» болтался около 0.5 и менялся от
-  прогона к прогону; финальный Choice между фразами спорил с пословными ответами
-  и предпочитал нетронутый текст. Оставили только `Choice {кандидаты…, keep_original}`
-  на слово с кандидатами и `Noul` на слово без кандидатов (→ `unresolved`).
-- **`glossary` vs `guesses`.** Глоссарий — уверенные термины (порог сходства 0.6).
-  Догадки агента про *это* сообщение — `guesses`, порог 0.35, в опциях помечены
-  «suggested by the assistant». Ложное «ответные → отвлечённые» было из-за того,
-  что догадку положили в glossary.
-- **`unresolved`** — обратная связь агенту: Jev считает слово испорченным, но
-  заменить нечем → расширь глоссарий/догадки и вызови ещё раз.
-- **Транслитерация** латиницы в `candidates.similarity`, иначе `мцп`/`MCP` = 0.0.
-- **`needs_clarification`** = вероятность топ-варианта < 0.75 (считается в коде).
-- **Логирование** всех вызовов в `evals/inbox.jsonl` (`INTERPRETER_LOG`), поле
-  `intended` заполняется руками → будущий eval-набор.
+- **Agent as the primary interpreter.** The agent is the strongest model
+  available, holds the conversation context and needs no key. Live tests showed
+  the bottleneck was hypothesis generation, not choice: "encumbrance" →
+  "communication" needs meaning, not a dictionary. The skill lives in
+  `skills/drunken-master/`; the MCP server (`interpreter/`) stays as a dev tool.
+- **Jev pipeline: one request.** Earlier there were three (per-word Noul "is it
+  garbled?" → Choice → Choice between whole sentences). The Noul sat near 0.5 and
+  flipped between runs; the sentence-level Choice contradicted the per-word
+  answers. Kept: `Choice {candidates…, keep_original}` per word with candidates,
+  `Noul` per word without (→ `unresolved`).
+- **`glossary` vs `guesses`.** Glossary = confident terms (similarity ≥ 0.6).
+  Guesses = the agent's hypotheses for *this* message (≥ 0.35, marked as
+  suggested). A guess put into the glossary once produced a false "ответные →
+  отвлечённые".
+- **Transliteration** in `candidates.similarity`; without it «мцп»/«MCP» = 0.0.
+- **`needs_clarification`** = top-reading probability < 0.75 (computed in code).
+- **Logging** of every call to `evals/inbox.jsonl`; `intended` filled by hand.
 
-## Классы ошибок, которые видели
+## Error classes seen
 
-| Класс | Пример | Ловится? |
+| Class | Example | Caught? |
 | - | - | - |
-| Фонетическое искажение термина | лиционер → лисенер, силы → скилы | да, уверенно |
-| Разбиение слова | до бага → дебаг | да (склейка соседних токенов) |
-| Кириллица ↔ латиница | мцп → MCP, дебак → debug | да, после транслитерации |
-| ASR подставил **реальное чужое слово** | Некто ← Нет, обременение ← общение, задачи ← здесь | плохо: фонетика не дотягивается, спасают только `guesses` от агента |
-| Термин не в глоссарии | нас → npm, гриха → github | нет; отдаём в `unresolved` |
+| Phonetic distortion of a term | лиционер → лисенер, силы → скилы | yes, confidently |
+| Word split | до бага → дебаг | yes (adjacent-token merge) |
+| Cyrillic ↔ Latin | мцп → MCP, дебак → debug | yes, after transliteration |
+| ASR substituted a **real, wrong word** | Некто ← Нет, обременение ← общение, задачи ← здесь, Сарат ← старт | only the agent; similarity search cannot reach it |
+| Term not in glossary | нас → npm, гриха → github | no; reported as `unresolved` |
 
-## Известные проблемы / что дальше
+## Skill iterations (skill-creator)
 
-1. **Разброс ответов Jev.** Проверено 4 одинаковыми запросами подряд: сама модель
-   даёт джиттер ≈ ±0.05–0.1 (`дебаг` 0.57 / 0.59 / 0.67 / 0.64). Это не наш баг,
-   но кейсы у порога 0.5 переворачиваются от прогона к прогону. Сильнее джиттера
-   влияет state: `лисинер → лисенер` с малым глоссарием без контекста — 0.22–0.31,
-   с большим глоссарием и `context` про пайплайн — 0.88. Вывод: качество
-   `context`/`glossary` от агента важнее порогов; при необходимости усреднять
-   2 запроса (дёшево: $0.042/Mtok).
-2. Кросс-скриптовый матчинг ограничен: `гриха`/`github` = 0.4. Агенту стоит
-   класть в глоссарий и русское написание (`гитхаб`).
-3. `unresolved` шумит (ложное «подсмотреть» 0.70). Порог Noul 0.5, подобрать по логу.
-4. **Eval-раннер есть**: `python -m interpreter.eval [-v] [--engines agent jev speller] [--no-guesses]`.
-   Кейсы: `evals/cases.jsonl` (курируемые, в git) + размеченные строки `evals/inbox.jsonl`.
-   Первый замер (10 кейсов, 2026-09-29):
+Cases: `skills/drunken-master/evals/evals.json` (12: 9 real messages from live
+sessions, 3 English, clean controls). Runs are independent subagents that see
+only `SKILL.md`.
 
-   | engine | top1 | wer | fixed | ask | примечание |
-   | - | - | - | - | - | - |
-   | agent (из лога) | 0.50 (n=2) | 0.15 | 0.50 | 0.50 | мало данных |
-   | jev + догадки агента | 0.60 | 0.09 | 0.59 | 0.40 | догадки из лога — это уже «агент+Jev» |
-   | jev сам | 0.50 | 0.14 | 0.38 | 0.10 | тянет только фонетику/транслит |
-   | Yandex Speller | 0.20 | 0.21 | 0.06 | 0 | ломает термины: лиционер→милиционер, бага→бога |
-
-   Вывод: без генерации гипотез агентом класс «реальное чужое слово» не берётся
-   никем; Speller как pre-pass вреден для жаргона. Порог 0.75 всё ещё не калиброван.
-5. Сервер в **этой** сессии поднимался при resume и мог быть старым процессом
-   (в ответе есть `jev_preference`/`coherence` → старый код). Новый код —
-   через `python -m interpreter ... --json` или новую сессию.
-
-## Архитектурное решение (2026-09-29)
-
-Первичный интерпретатор — **сам агент** (навык `skills/interpret`): он
-сильнее любого внешнего движка, видит контекст и не требует ключей. MCP остаётся
-для `record_interpretation` (eval-данные) и Jev как дешёвого верификатора догадок.
-`ClaudeEngine` (отдельный вызов Claude) написан, но не проверен вживую — нет
-`ANTHROPIC_API_KEY`, и после решения «агент сам» он нужен только для eval-сравнения.
-Конечная упаковка (скилл / MCP / плагин) не определена — решать по eval.
-
-## Навык `interpret` — итерации (skill-creator)
-
-Кейсы: `skills/interpret/evals/evals.json` (8: 7 реальных сообщений из лога +
-1 чистое). Прогоны — независимые сабагенты, видящие только SKILL.md; результаты и
-viewer — `evals/skill-review-iteration-N.html`.
-
-| Итерация | Что сравнивали | Результат |
+| Iteration | Compared | Result |
 | - | - | - |
-| 1 | навык vs без навыка, 4 кейса | 100% vs 81%; без навыка провал только на «Некто обременение… задачи» (прочитал «задачи» буквально, не дал вариантов) |
-| 2 | навык с правилом «показывай прочтение при любой правке» vs предыдущая версия, 8 кейсов | 100% vs 92%; старая версия промахнулась на «фвлм … описание» (→ «но … описан» вместо «вообще … определён»). На «подключилась» **обе** версии показали прочтение в сабагенте — молчаливую правку допустил я сам в живой сессии, не навык |
+| 1 | skill vs no skill, 4 cases, Opus | 100% vs 81%; without the skill the hard case («Некто обременение… задачи») was read literally with no alternatives |
+| 2 | "show the reading on any correction" vs previous version, 8 cases | 100% vs 92%; old version misread «фвлм … описание». On «подключилась» **both** versions showed the reading in a subagent — the silent fix happened in the live session, not in the skill |
+| 3 | same skill on **Haiku 4.5** | 80%: detection and "Read as" everywhere; overconfident (0.80 on a 3-word ambiguity), drops/reorders words, stops after the first fix |
+| 4 | Haiku, plus word-by-word check and confidence rule of thumb | 84%: calibration fixed (0.55 → asked); drift not fixed by text («ты он» → «Ты о чём», reorders) |
+| 5 | same skill on **Sonnet 5.5** | 96%: all readings correct, no drift, 12–25 s per reply; one miss in the substantive answer |
 
-| 3 | тот же навык на **Haiku 4.5**, 8 кейсов | **80%** (22/28). Детект и «Понял как» первой строкой — везде. Провалы: переуверенность (на «Некто обременение» 0.80 и действие без вопроса, Opus давал 0.5 и спрашивал); дрейф прочтения — выбрасывает слова («ты он иеть» → «зачем нахрена»), переставляет («подключила скилл сюда»); не чинит «описание»; ответ по существу слабее (переспрашивает вместо ответа, отвечает не на тот вопрос про ключ) |
+Models: Opus 100% · Sonnet 96% · Haiku 84%. Self-sufficiency threshold: Sonnet
+class. For Haiku the deterministic path (candidates in code, model only
+chooses) remains justified.
 
-| 4 | Haiku 4.5, навык + пословная сверка и ориентир по уверенности | **84%** (24/28). Калибровка починилась: на «Некто обременение» 0.55 → спросил, верный вариант первым. Но дрейф текстом не лечится: «ты он» → «Ты о чём», «скилл сюда» переставлено; «фвлм» просто удалено; на «строили…» переспросил с почти одинаковыми вариантами (надо/нужно) и не дал «стоило». Итог: +4 п.п., внутри разброса |
+Live finding after packaging: an agent read «Сарат райплайна» → «старт
+пайплайна» correctly but **started the pipeline before writing "Read as"** — it
+treated tool calls as preparation, not as the answer. The rule now says
+"before any tool call", with a higher bar for irreversible actions.
 
-| 5 | тот же навык на **Sonnet 5.5** | **96%** (27/28), 12–25 с на ответ (Haiku 40–150 с, Opus ~40 с). Все прочтения верны, дрейфа нет, калибровка адекватная (0.6 на «Некто обременение» → спросил). Единственный минус — ответ по существу на «большой словарь» начат с «скорее всего придётся», вопреки контексту |
+## Open problems
 
-Сводка по моделям: Opus 100% · Sonnet 96% · Haiku 84%. Порог «навык самодостаточен» — Sonnet-класс.
+1. **Trigger reliability in live sessions** is the main risk: subagents follow
+   the skill; a busy agent mid-conversation may skip it. The only hard
+   mechanism in Claude Code is a `UserPromptSubmit` hook that adds context (it
+   cannot rewrite the prompt).
+2. Jev jitter ≈ ±0.1 between identical requests; near-threshold cases flip.
+   State quality (context, glossary) matters more than thresholds.
+3. The 0.75 / 0.9 thresholds are not calibrated on enough data.
+4. `unresolved` is noisy («подсмотреть» 0.70 false positive).
 
-Вывод: навык решает трудный класс (ASR-подмена реальным словом) и дисциплину
-«прочтение до ответа»; на лёгких кейсах модель и без него это делает. Главный
-риск — не текст навыка, а то, что агент в живой сессии его не применит.
-Для слабых моделей узкое место — не детект, а калибровка уверенности и
-точность прочтения; здесь детерминированный путь MCP/Jev (кандидаты кодом,
-модель только выбирает) остаётся оправданным.
+## How to test
 
-## Как тестировать
-
-- `pytest` — механика на FakeJev, без ключа.
-- `python -m interpreter "текст" --glossary … --guesses … --context "…"` — реальный Jev.
-- Живой сценарий: свежая сессия Claude Code на ветке, `.mcp.json` + хук поднимают
-  сервер; писать с телефона и смотреть, зовёт ли агент инструмент и как собирает
-  глоссарий.
-- Правда для кейсов — в `evals/inbox.jsonl`, поле `intended`.
+- `pytest` — helper-server mechanics on FakeJev, no key.
+- `python -m interpreter "text" --glossary … --guesses …` — real Jev.
+- `python -m interpreter.eval -v` — engines vs labelled cases.
+- Live: install the plugin in a fresh session, write garbled messages, watch
+  whether the trigger fires and whether the reading precedes any action.

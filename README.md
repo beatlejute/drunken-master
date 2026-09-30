@@ -1,120 +1,134 @@
-# interpret — навык Claude Code для искажённых сообщений
+# Drunken Master
 
-Сообщение агенту может прийти искажённым откуда угодно: голосовой ввод, T9,
-свайп, быстрая печать, OCR, копипаст. Слова при этом часто превращаются в
-**другие реальные слова**: «обременение» вместо «общение», «Некто» вместо
-«Нет», «Джейн» вместо Jev. Спеллчекеры такое не ловят, а агент, действуя по
-буквальному тексту, делает не то.
+A Claude Code skill that reads garbled messages the way they were meant — and
+shows you its reading **before** it acts.
 
-Навык `interpret` заставляет агента **сначала показать, как он прочитал
-сообщение, и только потом отвечать**. Если прочтений несколько и уверенности
-нет — предложить варианты на выбор.
+Messages reach an agent mangled all the time: speech-to-text, autocorrect,
+swipe typing, hurried thumbs, OCR, copy-paste. The nasty part is that words
+often turn into *other real words*: "sever" for server, "stagging" for staging,
+"sea eye" for CI, «обременение» for «общение». Spellcheckers do not catch
+those, and an agent acting on the literal text does the wrong thing.
 
 ```
-Пользователь:  Некто обременение и тесты теперь будут проводить задачи чтобы не бегать
+User:   Can you run the ingratiation tests and push to stagging when the sea eye is green
 
-Агент:         Похоже, в сообщении есть ошибки распознавания. Вы имели в виду:
-               1. Нет, общение и тесты теперь будем проводить здесь, чтобы не бегать
-               2. Общение и тесты теперь будут проводить задачи, чтобы не бегать
-               3. Ничего из этого
+Agent:  Read as: "run the **integration** tests and push to **staging** when the **CI** is green"
+        Running the integration suite now; will push to staging once CI passes…
 ```
 
 ```
-Пользователь:  Меня интересует максимальная эффективность я даже не держусь за Джейн
+User:   merge the login one and delete the loging branch
 
-Агент:         Понял как: «…я даже не держусь за Jev».
-               Тогда предлагаю сравнить движки на eval-наборе…
+Agent:  Read as: "merge feature/login and delete the **loging** branch"
+        Merged feature/login. "loging" could be feature/login (just merged) or
+        feature/logging — which one should I delete?
+        1. feature/login
+        2. feature/logging
+        3. Neither
 ```
 
-Внешних сервисов, ключей и словарей нет: интерпретирует сама модель агента,
-опираясь на контекст разговора. Это осознанное решение — см. [почему](#почему-навык-а-не-сервис).
+No services, no API keys, no dictionaries: the agent's own model does the
+reading, using the conversation context. The skill works in any language; it
+was built and tested on Russian and English.
 
-## Установка
+## Install
 
-**Из репозитория, как плагин** (рекомендуется — обновляется вместе с репо):
+**From the repository, as a plugin** (recommended — updates with the repo):
 
 ```
-/plugin marketplace add beatlejute/interpreter
-/plugin install interpret@interpreter
+/plugin marketplace add beatlejute/drunken-master
+/plugin install drunken-master@drunken-master
 ```
 
-Или из терминала: `claude plugin marketplace add beatlejute/interpreter && claude plugin install interpret@interpreter`.
+From a terminal: `claude plugin marketplace add beatlejute/drunken-master && claude plugin install drunken-master@drunken-master`.
 
-**Вручную**: навык — одна папка [`skills/interpret/`](skills/interpret/).
-Скопировать её в `~/.claude/skills/interpret` (глобально) или в
-`<проект>/.claude/skills/interpret` (для одного проекта). Либо файл
-[`dist/interpret.skill`](dist/interpret.skill) кнопкой «Save skill» в Claude.
+**Manually**: the skill is a single folder, [`skills/drunken-master/`](skills/drunken-master/).
+Copy it to `~/.claude/skills/drunken-master` (all projects) or to
+`<project>/.claude/skills/drunken-master` (one project).
 
-Проверка: в новой сессии написать что-нибудь заведомо искажённое — первой
-строкой должно прийти «Понял как: …».
+Check: in a new session, type something deliberately garbled — the first line
+of the reply should be `Read as: …`.
 
-## Как работает
+## How it works
 
-Навык — это процедура из пяти шагов в [`SKILL.md`](skills/interpret/SKILL.md):
+The skill is a five-step procedure in [`SKILL.md`](skills/drunken-master/SKILL.md):
 
-1. **Найти подозрительные слова**: не согласуются с соседями, похожи по звучанию
-   на термин из контекста, не являются словами, «странно уместны».
-2. **Перебрать классы искажений** — по убыванию частоты:
+1. **Find suspicious words** — ones that disagree with their neighbours, sound
+   like a term from context, are not words at all, or are real words that do
+   not belong to the topic.
+2. **Run through the distortion classes**, most frequent first:
 
-   | Класс | Примеры |
+   | Class | Examples |
    | - | - |
-   | ASR подставил реальное чужое слово | Некто ← Нет; обременение ← общение; соврать ← словарь |
-   | Фонетическое искажение термина | лиционер ← лисенер; силы ← скилы |
-   | Разбиение / склейка | до бага ← дебаг; иеть ← и есть |
-   | Кириллица вместо латиницы | мцп ← MCP; Джейн ← Jev |
-   | T9 / свайп | фвлм ← вообще |
+   | ASR substituted a real but wrong word | sever ← server; sea eye ← CI; «Некто» ← Нет; «соврать» ← словарь |
+   | Phonetic distortion of a term | ingratiation ← integration; «лиционер» ← лисенер |
+   | Split / merge | de bug ← debug; «иеть» ← и есть |
+   | Wrong script / transliteration | Jane ← Jev; «мцп» ← MCP |
+   | Autocorrect / swipe | «фвлм» ← вообще; asdgh ← junk |
 
-3. **Составить 1–3 целостных прочтения** с уверенностью; менять только
-   искажённое, ничего не переставлять и не «улучшать». Пословная сверка с
-   оригиналом перед выдачей.
-4. **Действовать или спросить**: уверенность топ-прочтения ≥ 0.75 → одна строка
-   «Понял как: …» и ответ; ниже → нумерованный список вариантов и ожидание.
-   Прочтение показывается **всегда**, когда хоть одно слово заменено — даже
-   тривиальное.
-5. Записать в лог, если в сессии есть инструмент `record_interpretation`
-   (опционально; без него навык работает так же).
+3. **Compose 1–3 complete readings** with confidences; change only what is
+   garbled, never reorder or "improve"; check word by word against the
+   original before showing.
+4. **Act or ask**: top confidence ≥ 0.75 → one `Read as:` line, then act;
+   lower → a numbered list of readings and wait. The reading is shown
+   **whenever any word was replaced**, even a trivial one, and **before any
+   tool call**. Irreversible actions (approve, deploy, delete, send) need ≥ 0.9.
+5. Record the reading if the session has a `record_interpretation` tool
+   (optional; the skill works without it).
 
-## Результаты проверки
+## Evaluation
 
-8 кейсов — 7 реальных искажённых сообщений из живых сессий (голосовой ввод,
-свайп, T9) и одно чистое;
-28 проверок («прочтение показано до ответа», «замены верны», «спросил, когда
-неоднозначно», «чистое не тронуто»). Прогоны — независимые агенты, видевшие
-только `SKILL.md`.
+12 cases — 9 real garbled messages from live sessions (Russian: voice input,
+swipe, autocorrect) and 3 English cases, plus clean-message controls — and
+~40 assertions ("reading shown before the answer", "substitutions correct",
+"asked when ambiguous", "clean message untouched", "reading before tool calls").
+Runs were independent agents that saw only `SKILL.md`.
 
-| Модель | Пройдено | Комментарий |
+| Model | Passed | Notes |
 | - | - | - |
-| Opus 5.5 | 100% | без навыка — 81%: на трудном кейсе читает «задачи» буквально и не даёт вариантов |
-| Sonnet 5.5 | 96% | все прочтения верны, ~2× быстрее Opus; один промах в ответе по существу |
-| Haiku 4.5 | 84% | детект и «Понял как» везде; но выбрасывает/переставляет слова, инструкцией не лечится |
+| Opus 5.5 | 100% | without the skill — 81%: on the hard case it read «задачи» literally and offered no alternatives |
+| Sonnet 5.5 | 96% | every reading correct, ~2× faster than Opus; one miss in the substantive answer |
+| Haiku 4.5 | 84% | detects and shows the reading everywhere, but drops/reorders words; instructions do not fix that |
 
-Порог самодостаточности навыка — Sonnet-класс. Для Haiku нужен детерминированный
-путь (см. ниже). Подробности итераций — [`docs/NOTES.md`](docs/NOTES.md),
-кейсы и проверки — [`skills/interpret/evals/evals.json`](skills/interpret/evals/evals.json).
+The skill is self-sufficient from Sonnet class up. Iteration history:
+[`docs/NOTES.md`](docs/NOTES.md); cases and assertions:
+[`skills/drunken-master/evals/evals.json`](skills/drunken-master/evals/evals.json).
 
-## Почему навык, а не сервис
+## Why a skill and not a service
 
-Проект начинался как MCP-сервер на [TypeSafe Jev](https://docs.typesafe.ai/) —
-модели, которая выбирает из заданных вариантов и даёт откалиброванные
-вероятности. Живые тесты показали: узкое место не выбор, а **генерация
-гипотез** — понять, что «обременение» это «общение», может только модель с
-контекстом разговора. Она у агента уже есть, бесплатно и без ключей. Обзор
-готовых решений ([`docs/research-alternatives.md`](docs/research-alternatives.md))
-подтвердил: инструмента для контекстной правки реальных-но-чужих слов на русском
-с вариантами на выбор не существует, а спеллчекеры жаргон ломают
-(«лиционер → милиционер»).
+This started as an MCP server on top of [TypeSafe Jev](https://docs.typesafe.ai/),
+a model that picks among given options with calibrated probabilities. Live
+testing showed the bottleneck is not choosing but **generating hypotheses**:
+only a model with the conversation context can tell that "encumbrance" is
+"communication". The agent already has that context, for free, without keys. A
+survey of existing tools ([`docs/research-alternatives.md`](docs/research-alternatives.md))
+confirmed nothing off the shelf does contextual real-word correction with
+alternatives to choose from, and spellcheckers break jargon.
 
-Сервер остался как вспомогательный инструмент — [`docs/mcp-server.md`](docs/mcp-server.md):
-логирование прочтений в eval-набор, сравнение движков, детерминированная сборка
-текста для слабых моделей.
+The helper server survives as a development tool — [`docs/mcp-server.md`](docs/mcp-server.md):
+it logs readings into the eval set, compares engines, and offers a
+deterministic path for weaker models. Nothing in the plugin depends on it.
 
-## Разработка
+## What the plugin runs
+
+Nothing. The plugin is one Markdown skill file. It makes no network calls,
+runs no scripts, installs no packages and touches no settings. The Python
+package in this repository (`interpreter/`) is a separate development helper
+and is not part of the plugin.
+
+## Development
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -e .[dev]
-.venv/bin/python -m pytest                      # механика MCP-сервера
-.venv/bin/python -m interpreter.eval -v         # сравнение движков на размеченных кейсах
+.venv/bin/python -m pytest                      # helper server mechanics
+.venv/bin/python -m interpreter.eval -v         # compare engines on labelled cases
+claude plugin validate .                        # plugin manifest / skill checks
 ```
 
-Итерации навыка ведутся через `skill-creator`; результаты в
-`.claude/skills/interpret-workspace/` (не в git).
+To use the helper MCP server in this repo: `claude --mcp-config dev/mcp.json`.
+Skill iterations are run with `skill-creator`; results live in
+`.claude/skills/*-workspace/` (not in git).
+
+## License
+
+MIT.

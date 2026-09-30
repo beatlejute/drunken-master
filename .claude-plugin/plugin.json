@@ -1,10 +1,11 @@
 {
-  "name": "interpret",
-  "displayName": "interpret",
-  "version": "0.1.0",
-  "description": "Восстанавливает смысл искажённых сообщений (голосовой ввод, T9, свайп, OCR) и показывает прочтение до ответа.",
+  "name": "drunken-master",
+  "displayName": "Drunken Master",
+  "version": "1.0.0",
+  "description": "Reads garbled messages (speech-to-text, autocorrect, swipe, OCR) the way they were meant, shows the reading before acting, and asks when ambiguous.",
   "author": { "name": "beatlejute" },
-  "repository": "https://github.com/beatlejute/interpreter",
+  "homepage": "https://github.com/beatlejute/drunken-master",
+  "repository": "https://github.com/beatlejute/drunken-master",
   "license": "MIT",
-  "keywords": ["speech-to-text", "typos", "russian", "asr", "interpretation"]
+  "keywords": ["speech-to-text", "typos", "autocorrect", "asr", "input-correction", "clarification", "multilingual", "russian"]
 }

@@ -1,31 +1,36 @@
-# interpreter
+# drunken-master
 
-Репозиторий навыка `interpret` (см. README.md): агент восстанавливает смысл
-сообщений, искажённых любым вводом (speech-to-text, T9, свайп, OCR, спешная
-печать), и показывает прочтение до ответа. Вспомогательный MCP-сервер (`interpreter/`, `.mcp.json`) нужен для
-логирования прочтений в eval-набор и сравнения движков.
+Repository of the **Drunken Master** skill (see README.md): the agent recovers
+the meaning of messages garbled by any input path (speech-to-text, autocorrect,
+swipe, OCR, hurried typing) and shows its reading before acting. The Python
+package `interpreter/` is a development helper MCP server (logging readings into
+the eval set, engine comparison); it is not part of the plugin.
 
-## Правила для агента в этом проекте
+## Rules for the agent in this project
 
-- Сообщение выглядит искажённым (странные слова, фонетически похожие на
-  термины, грамматика ломается)? Сначала выполни навык `interpret`
-  (`skills/interpret/SKILL.md`): восстанови прочтения **сам**, без
-  внешних вызовов, затем действуй или уточни у пользователя.
-- Каждую интерпретацию записывай через `record_interpretation`, а после ответа
-  пользователя — повторно с `chosen`. Это наш eval-набор.
-- `interpret_message` (Jev / Claude-движки) — вспомогательные, для сравнения
-  на eval и как дешёвая проверка своей гипотезы через `guesses`.
-- Глоссарий проекта на случай сомнений: `interpreter`, `pipeline`, `candidates`,
-  `jev`, `server`, `дебаг`, `скилы`, `лисенер`, `Ванневар`, `Jev`, `Noul`,
-  `Choice`, `MCP`, `глоссарий`, `коммит`, `деплой`, `тесты`, `eval`, `inbox`.
+- Does the message look garbled (odd words, words that sound like terms,
+  broken grammar)? Apply the skill first — `skills/drunken-master/SKILL.md`:
+  recover the readings **yourself**, with no external calls, then act or ask.
+  The `Read as:` line comes before any tool call.
+- Record every reading with `record_interpretation` (when the helper server is
+  loaded), and again with `chosen` after the user answers. That log is the
+  eval set.
+- `interpret_message` (Jev / Claude engines) is auxiliary: for eval comparison
+  and as a cheap check of your own hypotheses via `guesses`.
+- Project glossary, in case of doubt: `drunken-master`, `interpreter`,
+  `pipeline`, `candidates`, `jev`, `server`, `Jev`, `Noul`, `Choice`, `MCP`,
+  `eval`, `inbox`, `skill`, `plugin`, `marketplace`, `дебаг`, `скилы`,
+  `лисенер`, `Ванневар`, `глоссарий`, `коммит`, `деплой`, `тесты`.
 
-## Разработка
+## Development
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -e .[dev]
 .venv/bin/python -m pytest
-.venv/bin/python -m interpreter "текст" --glossary слово1 слово2
+.venv/bin/python -m interpreter "text" --glossary word1 word2
+claude --mcp-config dev/mcp.json     # load the helper server in this repo
+claude plugin validate .             # check the plugin before publishing
 ```
 
-Вызовы инструмента дописываются в `evals/inbox.jsonl` (см. `INTERPRETER_LOG`
-в `.mcp.json`) — из них потом собирается eval-набор.
+Helper-server calls are appended to `evals/inbox.jsonl` (`INTERPRETER_LOG` in
+`dev/mcp.json`); labelled rows become eval cases.

@@ -1,11 +1,23 @@
 {
-  "name": "interpreter",
-  "owner": { "name": "beatlejute" },
+  "name": "drunken-master",
+  "owner": {
+    "name": "beatlejute",
+    "url": "https://github.com/beatlejute"
+  },
   "plugins": [
     {
-      "name": "interpret",
+      "name": "drunken-master",
       "source": "./",
-      "description": "Навык: восстановить, что пользователь имел в виду в искажённом сообщении, и показать прочтение до ответа."
+      "description": "Skill: recover what the user meant in a garbled message and show the reading before acting. No keys, no services.",
+      "version": "1.0.0",
+      "keywords": [
+        "speech-to-text",
+        "typos",
+        "autocorrect",
+        "asr",
+        "input-correction"
+      ]
     }
-  ]
+  ],
+  "description": "Drunken Master — a Claude Code skill that reads garbled messages (speech-to-text, autocorrect, swipe, OCR) the way they were meant and shows the reading before acting."
 }

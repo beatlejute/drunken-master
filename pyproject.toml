@@ -1,7 +1,7 @@
 [project]
-name = "interpreter"
+name = "drunken-master"
 version = "0.1.0"
-description = "Claude Code skill (plus helper MCP server) that reconstructs what a user meant in a garbled message"
+description = "Drunken Master: Claude Code skill (plus a development helper MCP server) that reads garbled messages the way they were meant"
 requires-python = ">=3.11"
 dependencies = ["mcp>=2.0", "httpx>=0.27", "rapidfuzz>=3.0", "anthropic>=1.0", "pydantic>=2.0"]
 

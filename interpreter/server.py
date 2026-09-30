@@ -29,8 +29,8 @@ from .engines import Engine, make_engine
 mcp = MCPServer(
     "interpreter",
     instructions=(
-        "Use `interpret_message` on user messages that look like they came from a phone "
-        "(speech-to-text, T9, swipe) before acting on them. Supply a glossary of domain "
+        "Development helper for the Drunken Master skill. Use `interpret_message` on user "
+        "messages that look garbled (speech-to-text, autocorrect, swipe) before acting on them. Supply a glossary of domain "
         "terms you know: project names, tool/skill names, jargon used earlier in the "
         "conversation. If the result says needs_clarification, present the variants to "
         "the user as a numbered list and ask which one they meant."
@@ -111,7 +111,7 @@ def record_interpretation(
     chosen: str | None = None,
     engine: str = "agent",
 ) -> dict[str, Any]:
-    """Record an interpretation the agent made itself (see .claude/skills/interpret).
+    """Record a reading the agent made itself (see skills/drunken-master/SKILL.md).
 
     Args:
         message: the raw user message.
@@ -141,10 +141,10 @@ def format_clarification(variants: list[str]) -> str:
 
     Purely a convenience so all agents phrase the clarification the same way.
     """
-    lines = ["Похоже, в сообщении есть опечатки или ошибки распознавания. Вы имели в виду:"]
+    lines = ["Looks like the message has recognition errors. Did you mean:"]
     for i, v in enumerate(variants, 1):
         lines.append(f"{i}. {v}")
-    lines.append(f"{len(variants) + 1}. Ничего из этого — оставить как есть")
+    lines.append(f"{len(variants) + 1}. None of these — keep as is")
     return "\n".join(lines)
 
 
