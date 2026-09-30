@@ -42,6 +42,13 @@ For every marked word, check the classes in descending order of frequency:
 | Split / merge | ASR cut one word into two known ones, or glued two | "de bug" ← debug; "alot" ← a lot; «до бага» ← дебаг; «иеть» ← и есть |
 | Wrong script / transliteration | a term written in the wrong alphabet | "Jane" ← Jev; «мцп» ← MCP; «дебак» ← debug |
 | Autocorrect / swipe | adjacent keys, autocorrect to a frequent word, junk | "ducking" ← (you know); "фвлм" ← вообще; "asdgh" ← junk |
+| Wrong keyboard layout | typed with the other layout active; letters map key-for-key | "ujnjdj" ← готово; "ghbdtn" ← привет; "Ghbdtn" ← Привет; «руддщ» ← hello |
+
+Wrong layout is the one deterministic class: the string looks like pure junk,
+but mapping each key to the other layout recovers it exactly (QWERTY ↔ ЙЦУКЕН:
+q→й w→ц e→у r→к t→е y→н u→г i→ш o→щ p→з [→х ]→ъ a→ф s→ы d→в f→а g→п h→р
+j→о k→л l→д ;→ж '→э z→я x→ч c→с v→м b→и n→т m→ь ,→б .→ю). If a junk-looking
+word decodes into a real word this way, that is the reading, at 0.95+.
 
 The first class is the most frequent and the hardest: the word looks normal and
 only the mismatch with context gives it away. That is exactly why this needs
@@ -130,6 +137,9 @@ don't run around" 0.5; the literal text 0.3; "Communication and tests will now
 be run by tasks…" 0.2.
 **Output:** the numbered list — the top is below 0.75 and the readings change
 the meaning.
+
+**Input:** "ujnjdj"
+**Output:** `Read as: "готово"` (wrong keyboard layout) — 0.95, act.
 
 **Input:** "run the tests, then commit"
 **Output:** nothing — the message is clean.

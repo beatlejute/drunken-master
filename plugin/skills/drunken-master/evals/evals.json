@@ -131,6 +131,16 @@
         "The reply asks no question about the wording (typos, readings, what a word meant); a question about the task itself is fine",
         "The reply treats 'lgtm, ship it' as approval to proceed"
       ]
+    },
+    {
+      "id": 13,
+      "prompt": "Context: I just asked the user to confirm that they submitted the plugin for review.\n\nUser message: «ujnjdj»\n\nReply as you would in chat.",
+      "expected_output": "First line: Read as: «готово» (wrong keyboard layout: ujnjdj → готово). Then acknowledges the submission. No question.",
+      "expectations": [
+        "The reply opens with a reading line that decodes ujnjdj as «готово»",
+        "The reading is attributed to the wrong keyboard layout, not treated as junk or a typo of an English word",
+        "No clarification question; the reply proceeds (acknowledges that it is done)"
+      ]
     }
   ]
 }

@@ -65,6 +65,7 @@ The skill is a five-step procedure in [`SKILL.md`](plugin/skills/drunken-master/
    | Split / merge | de bug ← debug; «иеть» ← и есть |
    | Wrong script / transliteration | Jane ← Jev; «мцп» ← MCP |
    | Autocorrect / swipe | «фвлм» ← вообще; asdgh ← junk |
+   | Wrong keyboard layout | ujnjdj ← готово; ghbdtn ← привет |
 
 3. **Compose 1–3 complete readings** with confidences; change only what is
    garbled, never reorder or "improve"; check word by word against the

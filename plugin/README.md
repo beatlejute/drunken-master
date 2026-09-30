@@ -31,7 +31,8 @@ Agent:  Read as: "merge feature/login and delete the **loging** branch"
    context, are not words at all, or are real words from the wrong topic.
 2. Runs them through the distortion classes: sound-alike substitution
    (sever ← server), phonetic distortion of a term (ingratiation ← integration),
-   split/merge (de bug ← debug), wrong script («мцп» ← MCP), autocorrect/swipe junk.
+   split/merge (de bug ← debug), wrong script («мцп» ← MCP), autocorrect/swipe junk,
+   wrong keyboard layout ("ujnjdj" ← готово).
 3. Composes 1–3 complete readings with confidences, changing only what is
    garbled — no reordering, no "improving" — and checks them word by word
    against the original.
