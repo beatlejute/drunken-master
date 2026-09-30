@@ -1,7 +1,7 @@
 {
   "name": "drunken-master",
   "displayName": "Drunken Master",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Reads garbled messages (speech-to-text, autocorrect, swipe, OCR) the way they were meant, shows the reading before acting, and asks when ambiguous.",
   "author": {
     "name": "beatlejute"
@@ -19,5 +19,5 @@
     "multilingual",
     "russian"
   ],
-  "icon": "icon.svg"
+  "icon": "icon.png"
 }

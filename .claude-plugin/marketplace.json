@@ -9,7 +9,7 @@
       "name": "drunken-master",
       "source": "./plugin",
       "description": "Skill: recover what the user meant in a garbled message and show the reading before acting. No keys, no services.",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "keywords": [
         "speech-to-text",
         "typos",
