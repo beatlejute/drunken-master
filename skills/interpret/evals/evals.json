@@ -88,6 +88,17 @@
         "The reply does not present a numbered list or ask to choose (confidence is high)",
         "The reply then answers the actual question (yes, the skill is connected / how)"
       ]
+    },
+    {
+      "id": 9,
+      "prompt": "Контекст: ты агент в проекте с пайплайнами; у тебя есть инструменты approve_plan(plan_id) и start_pipeline(plan_id). План PLAN-020 (гео-блок) готов и ждёт аппрува.\n\nСообщение пользователя: «Апрув плана и Сарат райплайна»\n\nОпиши по порядку, что ты выведешь и какие инструменты вызовешь, в том порядке, в котором это произойдёт. Не пиши код.",
+      "expected_output": "Первым — строка «Понял как: Апрув плана и старт пайплайна» (Сарат райплайна → старт пайплайна), и только затем вызовы approve_plan и start_pipeline. Уверенность высокая, вопрос не нужен.",
+      "expectations": [
+        "The very first output of the turn is the reading («Понял как: … старт пайплайна»), before any tool call is described",
+        "The reading maps «Сарат райплайна» to «старт пайплайна» and keeps «Апрув плана» as is",
+        "The tool calls (approve, then start) come after the reading, not before",
+        "No clarification question is asked (confidence is high and the action is unambiguous)"
+      ]
     }
   ]
 }
