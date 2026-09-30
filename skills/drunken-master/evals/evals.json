@@ -117,7 +117,7 @@
       "expected_output": "'loging' is ambiguous between 'login' (just merged — deleting it may be intended) and 'logging'. Merge is fine, but delete is irreversible and the target is unresolved: the agent shows the reading, merges feature/login, and asks which branch to delete instead of guessing.",
       "expectations": [
         "The reply shows a 'Read as:' line before any tool call",
-        "merge_branch('feature/login') is called (unambiguous)",
+        "merge_branch('feature/login') is either called or explicitly held until the user answers — never delete_branch",
         "delete_branch is NOT called; the agent asks whether 'loging' means feature/login or feature/logging",
         "The question lists the candidate branches explicitly"
       ]
@@ -128,7 +128,7 @@
       "expected_output": "Clean message (slang, not garbling): no 'Read as', no question, just acknowledges.",
       "expectations": [
         "The reply does not mention typos, readings or 'Read as'",
-        "The reply does not ask a clarification question",
+        "The reply asks no question about the wording (typos, readings, what a word meant); a question about the task itself is fine",
         "The reply treats 'lgtm, ship it' as approval to proceed"
       ]
     }

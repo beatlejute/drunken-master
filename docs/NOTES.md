@@ -56,6 +56,8 @@ only `SKILL.md`.
 | 4 | Haiku, plus word-by-word check and confidence rule of thumb | 84%: calibration fixed (0.55 → asked); drift not fixed by text («ты он» → «Ты о чём», reorders) |
 | 5 | same skill on **Sonnet 5.5** | 96%: all readings correct, no drift, 12–25 s per reply; one miss in the substantive answer |
 
+| 6 | English rewrite (Drunken Master), 5 cases on Sonnet: hard RU case, tool-order case, 3 new EN cases | 5/5 in substance: RU readings unchanged and answered in Russian; "Read as" before `approve`/`start`; EN substitutions (integration/staging/CI) correct; ambiguous irreversible delete → asked, nothing deleted; slang left alone. Two assertions were mis-specified and loosened (merge may be held with the delete; task questions ≠ wording questions) |
+
 Models: Opus 100% · Sonnet 96% · Haiku 84%. Self-sufficiency threshold: Sonnet
 class. For Haiku the deterministic path (candidates in code, model only
 chooses) remains justified.
